@@ -187,7 +187,7 @@ def _shared_connection_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--base-url",
         type=str,
-        default=None,
+        default="https://api.openai.com/v1/",
         help="OpenAI base URL (defaults to OPENAI_BASE_URL).",
     )
     parser.add_argument(
@@ -382,6 +382,8 @@ def _resolve_setting(
 
 def _normalize_base_url(value: str) -> str:
     """Ensure the base URL includes the Responses API prefix when omitted."""
+    if "openai.com" in value.lower():
+        return value
     trimmed = value.rstrip("/")
     lower_trimmed = trimmed.lower()
     if "/openai" not in lower_trimmed:
