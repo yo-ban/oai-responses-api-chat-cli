@@ -26,15 +26,12 @@ class ResponsesChatClient:
     def __init__(
         self,
         *,
-        base_url: str,
+        base_url: Optional[str],
         api_key: str,
         model: str,
     ) -> None:
         """Configure the OpenAI client."""
-        self._client = OpenAI(
-            api_key=api_key,
-            base_url=base_url,
-        )
+        self._client = OpenAI(api_key=api_key, base_url=base_url)
         self._model = model
 
     def send_message(

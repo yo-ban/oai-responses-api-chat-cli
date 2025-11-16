@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 import re
 from contextlib import contextmanager
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple, cast
 from uuid import UUID, uuid4
 
 from prompt_toolkit import PromptSession  # type: ignore
@@ -187,8 +187,8 @@ def _shared_connection_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--base-url",
         type=str,
-        default="https://api.openai.com/v1/",
-        help="OpenAI base URL (defaults to OPENAI_BASE_URL).",
+        default=None,
+        help="Base URL for the API; omit for api.openai.com or set OPENAI_BASE_URL/Azure endpoint.",
     )
     parser.add_argument(
         "--api-key",
@@ -223,13 +223,17 @@ def _run_chat(args: argparse.Namespace) -> None:
         config.get("base_url"),
         "OPENAI_BASE_URL",
         "base URL",
+        allow_missing=True,
     )
     base_url = _normalize_base_url(base_url_raw)
-    api_key = _resolve_setting(
-        args.api_key,
-        config.get("api_key"),
-        "OPENAI_API_KEY",
-        "API key",
+    api_key = cast(
+        str,
+        _resolve_setting(
+            args.api_key,
+            config.get("api_key"),
+            "OPENAI_API_KEY",
+            "API key",
+        ),
     )
     model = args.model or config.get("model") or "gpt-5"
     max_output_tokens = config.get("max_output_tokens")
@@ -368,7 +372,9 @@ def _resolve_setting(
     config_value: Optional[str],
     env_var: str,
     label: str,
-) -> str:
+    *,
+    allow_missing: bool = False,
+) -> Optional[str]:
     """Resolve a configuration value prioritizing CLI args, config, then environment."""
     if cli_value:
         return cli_value
@@ -377,11 +383,15 @@ def _resolve_setting(
     env_value = os.getenv(env_var)
     if env_value:
         return env_value
+    if allow_missing:
+        return None
     raise ValueError(f"Missing {label}. Provide via CLI, config, or set {env_var}.")
 
 
-def _normalize_base_url(value: str) -> str:
+def _normalize_base_url(value: Optional[str]) -> Optional[str]:
     """Ensure the base URL includes the Responses API prefix when omitted."""
+    if not value:
+        return None
     if "openai.com" in value.lower():
         return value
     trimmed = value.rstrip("/")
