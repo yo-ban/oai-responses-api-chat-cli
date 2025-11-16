@@ -88,17 +88,19 @@ class ResponsesChatClient:
     def _serialize_object(item: Any) -> Dict[str, object]:
         """Normalize output objects into dictionaries."""
         if hasattr(item, "model_dump"):
-            return cast(Dict[str, object], item.model_dump())
+            return cast(
+                Dict[str, object],
+                item.model_dump(exclude_unset=True, exclude_none=True),
+            )
         if isinstance(item, dict):
             return cast(Dict[str, object], item)
         raise TypeError(f"Unsupported output item type: {type(item)!r}")
 
     @classmethod
     def _sanitize_output_items(cls, output: Sequence[Any]) -> List[Dict[str, object]]:
-        """Convert SDK output items to plain dictionaries without dropping fields."""
+        """Convert SDK output items to plain dictionaries."""
         serialized: List[Dict[str, object]] = []
         for item in output:
             normalized = cls._serialize_object(item)
-            # Copy to avoid mutating SDK objects; retain all keys (including id/status).
-            serialized.append(dict(normalized))
+            serialized.append(normalized)
         return serialized

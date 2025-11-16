@@ -322,12 +322,18 @@ class ChatHistory:
 
     @staticmethod
     def _sanitize_output(output: Optional[List[Dict[str, object]]]) -> List[Dict[str, object]]:
-        """Return output items copied to plain dicts while preserving all fields."""
+        """Return output items copied to plain dicts, dropping unset/None fields."""
         if not output:
             return []
         sanitized: List[Dict[str, object]] = []
         for item in output:
-            sanitized.append(dict(item))
+            sanitized.append(
+                {
+                    key: value
+                    for key, value in item.items()
+                    if value is not None
+                }
+            )
         return sanitized
 
     @staticmethod
