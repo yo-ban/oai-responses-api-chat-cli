@@ -95,14 +95,10 @@ class ResponsesChatClient:
 
     @classmethod
     def _sanitize_output_items(cls, output: Sequence[Any]) -> List[Dict[str, object]]:
-        """Convert SDK output items to plain dictionaries."""
+        """Convert SDK output items to plain dictionaries without dropping fields."""
         serialized: List[Dict[str, object]] = []
         for item in output:
             normalized = cls._serialize_object(item)
-            sanitized = {
-                key: value
-                for key, value in normalized.items()
-                if key not in {"status", "id"}
-            }
-            serialized.append(sanitized)
+            # Copy to avoid mutating SDK objects; retain all keys (including id/status).
+            serialized.append(dict(normalized))
         return serialized
