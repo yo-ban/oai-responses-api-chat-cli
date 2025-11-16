@@ -1,0 +1,31 @@
+# Project metadata and dependency declarations for the CLI chat application.
+[project]
+name = "responses-chatcli"
+version = "0.1.0"
+description = "CLI chat client for the OpenAI Responses API (works with Azure OpenAI endpoints) using GPT-5."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=2.8.0,<3.0.0",
+    "python-dotenv>=1.2.1,<2.0.0",
+    "PyYAML>=6.0.3,<7.0.0",
+    "pymupdf>=1.23.8,<1.24.0",
+    "prompt_toolkit>=3.0.43,<4.0.0",
+]
+
+[project.scripts]
+chatcli = "chatcli.cli:launch"
+
+[build-system]
+requires = ["setuptools>=68.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pyright]
+include = ["src"]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+]
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
