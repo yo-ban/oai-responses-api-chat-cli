@@ -10,8 +10,10 @@ import sys
 from pathlib import Path
 import re
 from contextlib import contextmanager
-from typing import Dict, Iterator, List, Optional, Tuple, cast
+from datetime import datetime
+from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
 from uuid import UUID, uuid4
+import glob
 
 from prompt_toolkit import PromptSession  # type: ignore
 from prompt_toolkit.document import Document  # type: ignore
@@ -145,10 +147,17 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run", help="Start an interactive chat session.")
     _shared_connection_args(run_parser)
     run_parser.add_argument(
-        "--conversation-id",
+        "--resume",
+        nargs="?",
+        const="__LIST__",
+        default=None,
+        help="Resume by conversation id; omit value to pick from recent history.",
+    )
+    run_parser.add_argument(
+        "--conversation-id",  # backward compatibility
         type=str,
         default=None,
-        help="Conversation UUID to resume. Omit to start a fresh session.",
+        help=argparse.SUPPRESS,
     )
     run_parser.add_argument(
         "--history-file",
@@ -202,6 +211,12 @@ def _shared_connection_args(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="Override model identifier from configuration.",
     )
+    parser.add_argument(
+        "--profile",
+        type=str,
+        default=None,
+        help="Named profile defined in config.settings.yaml (e.g., --profile 2).",
+    )
 
 
 def _handle_set_prompt(args: argparse.Namespace) -> None:
@@ -217,10 +232,12 @@ def _run_chat(args: argparse.Namespace) -> None:
     config_created = ensure_config(config_path)
     if config_created:
         print(f"Created default config at {config_path}")
-    config = load_config(config_path, ensure=False)
+    config = cast(Dict[str, object], load_config(config_path, ensure=False))
+    if args.profile:
+        config = _apply_profile(config, args.profile)
     base_url_raw = _resolve_setting(
         args.base_url,
-        config.get("base_url"),
+        cast(Optional[str], config.get("base_url")),
         "OPENAI_BASE_URL",
         "base URL",
         allow_missing=True,
@@ -230,21 +247,25 @@ def _run_chat(args: argparse.Namespace) -> None:
         str,
         _resolve_setting(
             args.api_key,
-            config.get("api_key"),
+            cast(Optional[str], config.get("api_key")),
             "OPENAI_API_KEY",
             "API key",
         ),
     )
-    model = args.model or config.get("model") or "gpt-5"
-    max_output_tokens = config.get("max_output_tokens")
+    model = cast(str, args.model or config.get("model") or "gpt-5")
+    max_output_tokens = cast(Optional[int], config.get("max_output_tokens"))
+    reasoning_source = cast(dict, config.get("reasoning") or {})
     reasoning_config = {
         key: value
-        for key, value in (config.get("reasoning") or {}).items()
+        for key, value in reasoning_source.items()
         if value is not None
     }
 
-    conversation_id = _ensure_conversation_id(args.conversation_id)
-    history_path = _determine_history_path(args.history_file, conversation_id)
+    history_path, conversation_id = _resolve_history_selection(
+        history_override=args.history_file,
+        resume=args.resume,
+        legacy_conversation_id=args.conversation_id,
+    )
 
     developer_prompt = config["developer_prompt"]
     history = ChatHistory(history_path)
@@ -365,6 +386,101 @@ def _print_intro(config_path: Path, history_path: Path, conversation_id: str) ->
     print(f"Config file: {config_path}")
     print(f"History file: {history_path}")
     print("Type messages to send them to the model. Use :help for commands.")
+
+
+def _apply_profile(config: Dict[str, Any], profile_name: str) -> Dict[str, Any]:
+    """Merge a named profile into the loaded configuration."""
+    profiles = cast(Dict[str, Dict[str, Any]], config.get("profiles") or {})
+    if profile_name not in profiles:
+        raise ValueError(f"Profile '{profile_name}' not found in config.")
+    profile = cast(Dict[str, Any], profiles[profile_name] or {})
+    merged: Dict[str, Any] = dict(config)
+
+    for key in ("base_url", "api_key", "model", "max_output_tokens"):
+        if profile.get(key) is not None:
+            merged[key] = profile[key]
+    if profile.get("reasoning"):
+        reasoning = dict(cast(Dict[str, Any], config.get("reasoning") or {}))
+        profile_reasoning = cast(Dict[str, Any], profile["reasoning"])
+        reasoning.update({k: v for k, v in profile_reasoning.items() if v is not None})
+        merged["reasoning"] = reasoning
+    return merged
+
+
+def _resolve_history_selection(
+    *,
+    history_override: Optional[Path],
+    resume: Optional[str],
+    legacy_conversation_id: Optional[str],
+) -> Tuple[Path, str]:
+    """Determine history path and conversation id with optional resume selection."""
+    if history_override:
+        conversation_id = _conversation_id_from_filename(history_override) or _ensure_conversation_id(None)
+        return history_override, conversation_id
+
+    if resume is not None:
+        if resume != "__LIST__":
+            conversation_id = _ensure_conversation_id(resume)
+            return _determine_history_path(None, conversation_id), conversation_id
+        selected = _choose_recent_history()
+        if selected is None:
+            raise ValueError("No history selected. Provide an id with --resume <uuid> or start a new session.")
+        parsed_id = _conversation_id_from_filename(selected)
+        if not parsed_id:
+            raise ValueError(f"History file {selected} does not follow chat_history_<uuid>.yaml naming.")
+        return selected, parsed_id
+
+    if legacy_conversation_id:
+        conversation_id = _ensure_conversation_id(legacy_conversation_id)
+        return _determine_history_path(None, conversation_id), conversation_id
+
+    conversation_id = _ensure_conversation_id(None)
+    return _determine_history_path(None, conversation_id), conversation_id
+
+
+def _choose_recent_history(limit: int = 10) -> Optional[Path]:
+    """List recent history files and prompt the user to pick one."""
+    files = _recent_history_files(limit)
+    if not files:
+        print("No recent history found.")
+        return None
+
+    print("Recent conversations:")
+    for idx, path in enumerate(files, start=1):
+        print(f"  [{idx}] {path.name} (updated {_format_mtime(path)})")
+
+    while True:
+        choice = input(f"Select 1-{len(files)} (blank to cancel): ").strip()
+        if not choice:
+            return None
+        if choice.isdigit():
+            index = int(choice)
+            if 1 <= index <= len(files):
+                return files[index - 1]
+        print("Invalid selection.")
+
+
+def _recent_history_files(limit: int = 10) -> List[Path]:
+    """Return recent history files sorted by modification time desc."""
+    DEFAULT_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+    pattern = str(DEFAULT_HISTORY_DIR / "chat_history_*.yaml")
+    paths: List[Path] = [Path(p) for p in glob.glob(pattern)]
+    paths = [p for p in paths if p.is_file()]
+    paths.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return paths[:limit]
+
+
+def _conversation_id_from_filename(path: Path) -> Optional[str]:
+    """Extract conversation UUID from a history filename."""
+    match = re.match(r"chat_history_([0-9a-fA-F-]{36})\.yaml$", path.name)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _format_mtime(path: Path) -> str:
+    """Return human-friendly modified time."""
+    return datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y/%m/%d %H:%M:%S")
 
 
 def _resolve_setting(

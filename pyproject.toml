@@ -1,7 +1,7 @@
 # Project metadata and dependency declarations for the CLI chat application.
 [project]
 name = "responses-chatcli"
-version = "0.1.1"
+version = "0.1.2"
 description = "CLI chat client for the OpenAI Responses API (works with Azure OpenAI endpoints) using GPT-5."
 readme = "README.md"
 requires-python = ">=3.11"

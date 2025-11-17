@@ -3,4 +3,4 @@
 """Responses API Chat CLI package initializer providing package metadata."""
 
 __all__ = ["__version__"]
-__version__ = "0.1.1"
+__version__ = "0.1.2"

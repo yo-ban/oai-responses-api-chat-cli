@@ -7,10 +7,44 @@ This lightweight command-line client makes it easy to chat with the OpenAI Respo
 - Python 3.11+
 - Configured OpenAI (or Azure OpenAI) resource with a GPT-5 deployment
 - Connection settings via `config/settings.yaml` (preferred) or environment variables:
-  - `base_url` or `OPENAI_BASE_URL`
-  - `api_key` or `OPENAI_API_KEY`
+- `base_url` or `OPENAI_BASE_URL`
+- `api_key` or `OPENAI_API_KEY`
 
-The CLI defaults to `--model gpt-5`. Override it via CLI flag when you need a different deployment. You can provide the Azure resource root (for example `https://<resource>.openai.azure.com`) and the CLI will append `/openai/v1` automatically when missing. Settings defined in `config/settings.yaml` take precedence; the CLI falls back to environment variables (including those loaded from a local `.env` file) when a value is not present in the config.
+The CLI defaults to `--model gpt-5`. Override it via CLI flag when you need a different deployment. Leave `base_url` empty when calling the public OpenAI API; the SDK default (`https://api.openai.com/v1`) is used automatically. Provide the Azure resource root (for example `https://<resource>.openai.azure.com`) when targeting Azure and the CLI will append `/openai/v1` when missing. Settings defined in `config/settings.yaml` take precedence; the CLI falls back to environment variables (including those loaded from a local `.env` file) when a value is not present in the config.
+
+You can define multiple profiles under `profiles` in `config/settings.yaml` and select them with `--profile <name>`.
+
+Example `config/settings.yaml` structure:
+
+```yaml
+developer_prompt: |
+  You are an assistant that provides concise, accurate responses while citing assumptions.
+  Keep answers in Japanese unless the user explicitly requests another language.
+base_url: null
+api_key: null
+model: gpt-5
+max_output_tokens: null
+reasoning:
+  effort: medium
+  summary: null
+profiles:
+  "1":
+    base_url: https://api.openai.com/v1
+    api_key: sk-xxx
+    model: gpt-5
+    max_output_tokens: null
+    reasoning:
+      effort: medium
+      summary: null
+  "2":
+    base_url: https://my-azure-resource.openai.azure.com
+    api_key: azure-key
+    model: gpt-5-azure
+    max_output_tokens: 2048
+    reasoning:
+      effort: high
+      summary: null
+```
 
 ## Installation
 
@@ -60,8 +94,10 @@ The CLI copies image assets into `data/assets/<conversation>`; PDFs are converte
 Resume a prior conversation by supplying its UUID:
 
 ```bash
-chatcli run --conversation-id 12345678-1234-5678-1234-567812345678
+chatcli run --resume 12345678-1234-5678-1234-567812345678
 ```
+
+Use `chatcli run --resume` (without an id) to pick from the most recent histories.
 
 Inline commands:
 

@@ -26,6 +26,7 @@ _DEFAULT_CONFIG: Dict[str, Any] = {
         "effort": "medium",
         "summary": None,
     },
+    "profiles": {},
 }
 
 
@@ -78,8 +79,11 @@ def save_prompt(prompt_text: str, path: Path = DEFAULT_CONFIG_PATH) -> None:
 def _merge_defaults(config: Dict[str, Any]) -> Dict[str, Any]:
     """Merge defaults into a config dict without mutating the input."""
     merged = dict(_DEFAULT_CONFIG)
-    merged.update({k: v for k, v in config.items() if k != "reasoning"})
+    merged.update({k: v for k, v in config.items() if k not in {"reasoning", "profiles"}})
     reasoning = dict(_DEFAULT_CONFIG["reasoning"])
     reasoning.update(config.get("reasoning") or {})
     merged["reasoning"] = reasoning
+    profiles = dict(_DEFAULT_CONFIG["profiles"])
+    profiles.update(config.get("profiles") or {})
+    merged["profiles"] = profiles
     return merged
