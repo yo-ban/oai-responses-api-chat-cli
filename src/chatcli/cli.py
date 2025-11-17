@@ -293,10 +293,10 @@ def _run_chat(args: argparse.Namespace) -> None:
     while True:
         user_input, exit_requested = input_manager.read()
         if exit_requested:
-            _print_farewell(history, conversation_id)
+            _print_farewell(history, conversation_id, args.profile)
             break
         if user_input in EXIT_COMMANDS:
-            _print_farewell(history, conversation_id)
+            _print_farewell(history, conversation_id, args.profile)
             break
         if user_input == ":help":
             print(_render_help())
@@ -362,11 +362,12 @@ def _run_chat(args: argparse.Namespace) -> None:
         context = history.build_context()
         print(f"Assistant> {result.message_text}")
 
-def _print_farewell(history: ChatHistory, conversation_id: str) -> None:
+def _print_farewell(history: ChatHistory, conversation_id: str, profile: Optional[str]) -> None:
     """Display exit message with resume hint when history exists."""
     print("Goodbye.")
     if history.path.exists():
-        print(f"Resume with: chatcli run --resume {conversation_id}")
+        profile_hint = f" --profile {profile}" if profile else ""
+        print(f"Resume with: chatcli run --resume {conversation_id}{profile_hint}")
 
 
 def _render_help() -> str:
