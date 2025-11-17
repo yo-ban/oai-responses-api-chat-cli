@@ -27,6 +27,7 @@ max_output_tokens: null
 reasoning:
   effort: medium
   summary: null
+pdf_render_dpi: 200
 profiles:
   "1":
     base_url: https://api.openai.com/v1

@@ -22,6 +22,7 @@ _DEFAULT_CONFIG: Dict[str, Any] = {
     "api_key": None,
     "model": "gpt-5",
     "max_output_tokens": None,
+    "pdf_render_dpi": 200,
     "reasoning": {
         "effort": "medium",
         "summary": None,

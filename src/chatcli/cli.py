@@ -270,7 +270,8 @@ def _run_chat(args: argparse.Namespace) -> None:
     developer_prompt = config["developer_prompt"]
     history = ChatHistory(history_path)
     context = history.build_context()
-    asset_store = AssetStore().for_conversation(conversation_id)
+    pdf_render_dpi = int(cast(Optional[int], config.get("pdf_render_dpi")) or 200)
+    asset_store = AssetStore(pdf_render_dpi=pdf_render_dpi).for_conversation(conversation_id)
 
     client = ResponsesChatClient(
         base_url=base_url,
