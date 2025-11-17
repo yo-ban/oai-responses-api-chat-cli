@@ -279,7 +279,13 @@ def _run_chat(args: argparse.Namespace) -> None:
         model=model,
     )
 
-    _print_intro(config_path, history_path, conversation_id)
+    _print_intro(
+        config_path,
+        history_path,
+        conversation_id,
+        model=model,
+        profile=args.profile,
+    )
     _display_history(history.entries())
 
     input_manager = InputManager()
@@ -360,7 +366,7 @@ def _print_farewell(history: ChatHistory, conversation_id: str) -> None:
     """Display exit message with resume hint when history exists."""
     print("Goodbye.")
     if history.path.exists():
-        print(f"Resume with: chatcli run --conversation-id {conversation_id}")
+        print(f"Resume with: chatcli run --resume {conversation_id}")
 
 
 def _render_help() -> str:
@@ -380,9 +386,18 @@ def _render_help() -> str:
     )
 
 
-def _print_intro(config_path: Path, history_path: Path, conversation_id: str) -> None:
+def _print_intro(
+    config_path: Path,
+    history_path: Path,
+    conversation_id: str,
+    *,
+    model: str,
+    profile: Optional[str],
+) -> None:
     """Display startup guidance for the operator."""
-    print("Responses API Chat CLI (GPT-5)")
+    profile_label = f" (profile: {profile})" if profile else ""
+    print(f"Responses API Chat CLI")
+    print(f"Model: {model}{profile_label}")
     print(f"Conversation id: {conversation_id}")
     print(f"Config file: {config_path}")
     print(f"History file: {history_path}")
